@@ -17,8 +17,8 @@ This project is a custom writeback table extension for Qlik Cloud, built using [
    git clone https://github.com/izu93/qlik-writeback-table-nebulaJS.git
 
 2. Install dependencies:
-   ```npm install
+   npm install
 
 3. Start development mode:
-   ```nebula serve
+   nebula serve
 
