@@ -1,14 +1,19 @@
-import { useElement } from '@nebula.js/stardust';
-import properties from './object-properties';
-import data from './data';
-import ext from './ext';
+// src/index.js
+import React from "react";
+import * as ReactDOM from "react-dom"; // Using old ReactDOM import
+import { useElement } from "@nebula.js/stardust";
+import properties from "./object-properties";
+import data from "./data";
+import ext from "./ext";
+
+// Simple component using React.createElement instead of JSX
+const HelloComponent = () => {
+  return React.createElement("div", null, "Hello Writeback Table!");
+};
+
 /**
  * Entrypoint for your sense visualization
  * @param {object} galaxy Contains global settings from the environment.
- * Useful for cases when stardust hooks are unavailable (ie: outside the component function)
- * @param {object} galaxy.anything Extra environment dependent options
- * @param {object=} galaxy.anything.sense Optional object only present within Sense,
- * see: https://qlik.dev/extend/build-extension/in-qlik-sense
  */
 export default function supernova(galaxy) {
   return {
@@ -19,7 +24,29 @@ export default function supernova(galaxy) {
     ext: ext(galaxy),
     component() {
       const element = useElement();
-      element.innerHTML = '<div>Hello Writeback Table!</div>'; // eslint-disable-line
+
+      try {
+        // Use the classic render method (not createRoot)
+        ReactDOM.render(React.createElement(HelloComponent), element);
+
+        // Return a cleanup function to unmount React when needed
+        return () => {
+          try {
+            ReactDOM.unmountComponentAtNode(element);
+          } catch (e) {
+            console.error("Error unmounting React:", e);
+            // Fallback cleanup
+            element.innerHTML = "";
+          }
+        };
+      } catch (e) {
+        console.error("Error rendering React:", e);
+        // Fallback to direct DOM manipulation
+        element.innerHTML = "<div>Hello Writeback Table!</div>";
+        return () => {
+          element.innerHTML = "";
+        };
+      }
     },
   };
 }
