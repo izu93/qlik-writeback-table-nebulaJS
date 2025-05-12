@@ -6,10 +6,8 @@ import properties from "./object-properties";
 import data from "./data";
 import ext from "./ext";
 
-// Simple component using React.createElement instead of JSX
-const HelloComponent = () => {
-  return React.createElement("div", null, "Hello Writeback Table!");
-};
+// Import the component
+import HelloComponent from "./HelloComponent";
 
 /**
  * Entrypoint for your sense visualization
@@ -26,7 +24,7 @@ export default function supernova(galaxy) {
       const element = useElement();
 
       try {
-        // Use the classic render method (not createRoot)
+        // Use the classic render method WITHOUT JSX
         ReactDOM.render(React.createElement(HelloComponent), element);
 
         // Return a cleanup function to unmount React when needed

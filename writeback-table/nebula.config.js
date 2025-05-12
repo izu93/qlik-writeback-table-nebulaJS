@@ -1,26 +1,27 @@
 // nebula.config.js
+const webpack = require("webpack");
+
 module.exports = {
   build: {
     webpack(config) {
-      // Add babel-loader for JSX
+      // Add babel-loader for JSX with explicit configuration
       config.module.rules.push({
         test: /\.(js|jsx)$/,
         exclude: /node_modules/,
         use: {
           loader: "babel-loader",
           options: {
-            presets: ["@babel/preset-env", "@babel/preset-react"],
+            presets: [
+              "@babel/preset-env",
+              ["@babel/preset-react", { runtime: "classic" }],
+            ],
+            plugins: ["@babel/plugin-transform-react-jsx"],
           },
         },
       });
 
       // Enable resolving .jsx extensions
       config.resolve.extensions = [".js", ".jsx", ".json"];
-
-      // Define process.env
-      if (!config.plugins) {
-        config.plugins = [];
-      }
 
       // Add process definition
       config.resolve.fallback = {
@@ -29,7 +30,6 @@ module.exports = {
       };
 
       // Define a global process variable
-      const webpack = require("webpack");
       config.plugins.push(
         new webpack.ProvidePlugin({
           process: "process/browser",
