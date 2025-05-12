@@ -1,13 +1,13 @@
 // src/index.js
 import React from "react";
-import * as ReactDOM from "react-dom"; // Using old ReactDOM import
-import { useElement } from "@nebula.js/stardust";
+import * as ReactDOM from "react-dom";
+import { useElement, useLayout } from "@nebula.js/stardust";
 import properties from "./object-properties";
 import data from "./data";
 import ext from "./ext";
 
-// Import the component
-import HelloComponent from "./HelloComponent";
+// Import our WritebackTableComponent
+import WritebackTableComponent from "./WritebackTableComponent";
 
 /**
  * Entrypoint for your sense visualization
@@ -22,10 +22,14 @@ export default function supernova(galaxy) {
     ext: ext(galaxy),
     component() {
       const element = useElement();
+      const layout = useLayout();
 
       try {
         // Use the classic render method WITHOUT JSX
-        ReactDOM.render(React.createElement(HelloComponent), element);
+        ReactDOM.render(
+          React.createElement(WritebackTableComponent, { layout }),
+          element
+        );
 
         // Return a cleanup function to unmount React when needed
         return () => {
@@ -40,7 +44,7 @@ export default function supernova(galaxy) {
       } catch (e) {
         console.error("Error rendering React:", e);
         // Fallback to direct DOM manipulation
-        element.innerHTML = "<div>Hello Writeback Table!</div>";
+        element.innerHTML = "<div>Error rendering Writeback Table!</div>";
         return () => {
           element.innerHTML = "";
         };
