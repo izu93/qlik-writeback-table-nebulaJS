@@ -1,7 +1,7 @@
 // src/index.js
 import React from "react";
 import * as ReactDOM from "react-dom";
-import { useElement, useLayout } from "@nebula.js/stardust";
+import { useElement, useLayout, useSelections } from "@nebula.js/stardust";
 import properties from "./object-properties";
 import data from "./data";
 import ext from "./ext";
@@ -23,11 +23,15 @@ export default function supernova(galaxy) {
     component() {
       const element = useElement();
       const layout = useLayout();
+      const selections = useSelections();
 
       try {
         // Use the classic render method WITHOUT JSX
         ReactDOM.render(
-          React.createElement(WritebackTableComponent, { layout }),
+          React.createElement(WritebackTableComponent, {
+            layout,
+            selections,
+          }),
           element
         );
 
