@@ -43,8 +43,10 @@ const WritebackTableComponent = ({ layout, selections }) => {
   const [selectedCells, setSelectedCells] = useState({});
   // State to track cells that have been clicked but not yet confirmed
   const [pendingSelections, setPendingSelections] = useState({});
-  // Reference to track if selections are active
-  const isSelectionActive = useRef(false);
+  // Track the current dimension being selected
+  const [currentDimension, setCurrentDimension] = useState(null);
+  // Values currently selected (before confirmation)
+  const [currentValues, setCurrentValues] = useState([]);
 
   // Extract data from the hypercube when the layout changes
   useEffect(() => {
@@ -86,8 +88,8 @@ const WritebackTableComponent = ({ layout, selections }) => {
         });
         setSelectedCells(newSelectedCells);
 
-        // Only clear pending selections if we're not in selection mode
-        if (!isSelectionActive.current) {
+        // Only clear pending if not in active selection mode
+        if (!selections?.isActive()) {
           setPendingSelections({});
         }
       } else {
@@ -99,93 +101,124 @@ const WritebackTableComponent = ({ layout, selections }) => {
       setHeaders([]);
       setTableData([]);
     }
-  }, [layout]);
+  }, [layout, selections]);
 
   // Monitor selections API state
   useEffect(() => {
     if (selections) {
-      // Function to handle when selection mode begins
-      const handleActivated = () => {
-        console.log("Selection mode activated");
-        isSelectionActive.current = true;
-      };
-
-      // Function to handle when selection mode ends
-      const handleConfirmed = () => {
-        console.log("Selections confirmed");
-        isSelectionActive.current = false;
+      const onDeactivated = () => {
+        console.log("Selection mode deactivated");
         setPendingSelections({});
+        setCurrentDimension(null);
+        setCurrentValues([]);
       };
 
-      const handleCanceled = () => {
+      const onCanceled = () => {
         console.log("Selections canceled");
-        isSelectionActive.current = false;
         setPendingSelections({});
+        setCurrentDimension(null);
+        setCurrentValues([]);
+      };
+
+      const onConfirmed = () => {
+        console.log("Selections confirmed");
+        setPendingSelections({});
+        setCurrentDimension(null);
+        setCurrentValues([]);
       };
 
       // Set up listeners
-      selections.on("activated", handleActivated);
-      selections.on("deactivated", handleCanceled);
-      selections.on("confirmed", handleConfirmed);
-      selections.on("canceled", handleCanceled);
+      selections.on("deactivated", onDeactivated);
+      selections.on("canceled", onCanceled);
+      selections.on("confirmed", onConfirmed);
 
-      // Cleanup listeners on unmount
+      // Cleanup on unmount
       return () => {
-        selections.off("activated", handleActivated);
-        selections.off("deactivated", handleCanceled);
-        selections.off("confirmed", handleConfirmed);
-        selections.off("canceled", handleCanceled);
+        selections.off("deactivated", onDeactivated);
+        selections.off("canceled", onCanceled);
+        selections.off("confirmed", onConfirmed);
       };
     }
   }, [selections]);
 
   // Handle cell click for selections
   const handleCellClick = (rowIndex, colIndex, qElemNumber) => {
-    // Only make selections on dimensions (not measures) and if the element is selectable
+    // Only make selections on dimensions (not measures) and if element is selectable
     if (
       colIndex < (layout?.qHyperCube?.qDimensionInfo?.length || 0) &&
       qElemNumber !== -1
     ) {
-      console.log(`Selecting dimension ${colIndex}, element ${qElemNumber}`);
+      console.log(`Clicking dimension ${colIndex}, element ${qElemNumber}`);
 
-      // Update pending selections immediately for visual feedback
-      const cellKey = `${rowIndex}-${colIndex}`;
+      // If we're starting a new selection or changing dimensions
+      if (currentDimension === null || currentDimension !== colIndex) {
+        if (selections && !selections.isActive()) {
+          // Begin a new selection
+          console.log(`Beginning selection on dimension ${colIndex}`);
+          selections.begin(
+            ["/qHyperCubeDef/qDimensionInfo/", colIndex].join("")
+          );
 
-      // Set the selection active flag
-      isSelectionActive.current = true;
+          // Set the current dimension
+          setCurrentDimension(colIndex);
 
-      // Update UI immediately
-      setPendingSelections((prev) => {
-        // Toggle pending selection
-        if (prev[cellKey]) {
-          const newPending = { ...prev };
-          delete newPending[cellKey];
-          return newPending;
-        } else {
-          return {
-            ...prev,
-            [cellKey]: true,
-          };
-        }
-      });
+          // Initialize with this value
+          setCurrentValues([qElemNumber]);
 
-      try {
-        // Check if selections object is available
-        if (selections) {
-          // Use simple selection method for dimension values
+          // Clear any previous pending selections
+          setPendingSelections({});
+
+          // Add this cell to pending selections
+          setPendingSelections({ [`${rowIndex}-${colIndex}`]: true });
+
+          // Make the actual selection
           selections.select({
             method: "selectHyperCubeValues",
             params: ["/qHyperCubeDef", colIndex, [qElemNumber], false],
           });
         }
-      } catch (error) {
-        console.error("Error making selection:", error);
-        // Clear pending selection if there was an error
+      } else if (currentDimension === colIndex) {
+        // We're adding/removing from existing selection on same dimension
+        console.log(
+          `Adding/removing value ${qElemNumber} on dimension ${colIndex}`
+        );
+
+        // Toggle this value
+        let newValues = [...currentValues];
+        const idx = newValues.indexOf(qElemNumber);
+
+        if (idx === -1) {
+          // Add the value
+          newValues.push(qElemNumber);
+        } else {
+          // Remove the value
+          newValues.splice(idx, 1);
+        }
+
+        // Update current values
+        setCurrentValues(newValues);
+
+        // Toggle this cell in pending selections
         setPendingSelections((prev) => {
+          const cellKey = `${rowIndex}-${colIndex}`;
           const newPending = { ...prev };
-          delete newPending[cellKey];
+
+          if (newPending[cellKey]) {
+            delete newPending[cellKey];
+          } else {
+            newPending[cellKey] = true;
+          }
+
           return newPending;
         });
+
+        // Update the selection in Qlik
+        if (selections) {
+          selections.select({
+            method: "selectHyperCubeValues",
+            params: ["/qHyperCubeDef", colIndex, newValues, false],
+          });
+        }
       }
     } else {
       console.log("Cell is not selectable or is a measure");
@@ -226,7 +259,9 @@ const WritebackTableComponent = ({ layout, selections }) => {
                     cell.qState === "S";
                   const isPendingSelection =
                     pendingSelections[`${rowIndex}-${colIndex}`] ||
-                    (isSelectionActive.current && cell.qState === "X");
+                    (currentDimension === colIndex &&
+                      currentValues.includes(cell.qElemNumber)) ||
+                    cell.qState === "X";
 
                   let cellStyle = tdStyle;
                   if (isSelected) {
@@ -242,6 +277,7 @@ const WritebackTableComponent = ({ layout, selections }) => {
                       onClick={() =>
                         handleCellClick(rowIndex, colIndex, cell.qElemNumber)
                       }
+                      title={`Element: ${cell.qElemNumber}, State: ${cell.qState}`}
                     >
                       {cell.value}
                     </td>
